@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -9,8 +10,12 @@
 #include <net/if_arp.h>
 #include <netinet/in.h>
 
+#include <mysql/mysql.h>
+
 #define INTERFAZ "wlan0"
 #define RESPUESTA "Respuesta: La IP %s pertenece a %02X:%02X:%02X:%02X:%02X:%02X\n"
+#define MAC_TEMPLATE "%02X:%02X:%02X:%02X:%02X:%02X"
+#define IP_TEMPLATE "%u.%u.%u.%u"
 
 struct msgARP{
 	unsigned char destinoEthernet[6];
@@ -58,7 +63,7 @@ void *sendRequests()
 			perror("ERROR al obtener IP origen");
 			return -1;
 		}
-		
+
 	memcpy(&msg.origenIP, &ifr.ifr_hwaddr.sa_data[2], 4);
 
 	close(ifreq_socket);
@@ -117,6 +122,8 @@ void * receiveReplies()
 	int s, n, i;
 	struct msgARP msg;
 	struct sockaddr sa;
+	unsigned char unaMac[6];
+	unsigned char unaIp[4];
 
 	if((s = socket(AF_INET, SOCK_PACKET, htons(ETH_P_ARP))) < 0)
 		{
@@ -135,10 +142,62 @@ void * receiveReplies()
 				perror("ERROR al recibir");
 				return -1;
 			}
-		i++;
-		printf("\n%d\n", i);
+		if((ntohs(msg.tipoARP) == ARPOP_REPLY))
+		{
+			i++;
+
+			memcpy(unaMac, &msg.origenMAC, 6);
+			memcpy(unaIp, &msg.origenIP, 4);
+
+			guardarEnTabla(unaMac, unaIp);
+
+		}
+		
 		}while(1);
 
+}
+
+void guardarEnTabla(unsigned char * mac, unsigned char * ip)
+{
+	char ip_str[20];
+	char mac_str[20];
+
+	MYSQL *conn;
+	
+	char *server = "localhost";
+	char *user = "root";
+	char *password = "//lsoazules"; 
+	char *database = "redes";
+
+	//Convertir mac e ip a cadenas
+	sprintf(mac_str, MAC_TEMPLATE, 
+						mac[0], mac[1], mac[2], mac[3],
+						mac[4], mac[5]
+						); 
+
+	sprintf(ip_str, IP_TEMPLATE, ip[0], ip[1], ip[2], ip[3]);
+
+	conn = mysql_init(NULL);
+	if(!mysql_real_connect(conn, server, user, password, database, 0, NULL, 0))	
+	{	
+		fprintf(stderr, "ERROR para conectarse a mysql", mysql_error(conn));
+		return -1;
+	}
+	else
+	{
+		char query[80] = "insert into tablaARP (mac, ip) values (\'";
+			strcat(query, mac_str);
+			strcat(query, "\',\'");
+			strcat(query, ip_str);
+			strcat(query, "\')");
+
+			printf("\nQUERY: %s\n", query);
+
+		if(mysql_query(conn, query))
+			fprintf(stderr, "\nNEL con el query\n", mysql_error(conn));		
+	}
+
+	mysql_close(conn);
 }
 
 int main()
@@ -157,6 +216,6 @@ int main()
             printf("\n Receiving...\n");
 
 
-    sleep(60);
+    sleep(30);
     printf("\nBYE\n"); 
 }
