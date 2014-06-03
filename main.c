@@ -49,35 +49,37 @@ void *sendRequests()
 			perror("ERROR al obtener MAC origen");
 			return -1;
 		}
+
+	memcpy(&msg.origenEthernet, &ifr.ifr_hwaddr.sa_data, 6);
+	memcpy(&msg.origenMAC, &ifr.ifr_hwaddr.sa_data, 6);
 	
 	if(ioctl(ifreq_socket, SIOCGIFADDR, &ifr) < 0)
 		{
 			perror("ERROR al obtener IP origen");
 			return -1;
 		}
+		
+	memcpy(&msg.origenIP, &ifr.ifr_hwaddr.sa_data[2], 4);
 
 	close(ifreq_socket);
 
 	//Fill most of the packet
 	memset(&msg.destinoEthernet, 0xff, 6);
-	memcpy(&msg.origenEthernet, &ifr.ifr_hwaddr.sa_data, 6);
 	msg.tipoEthernet = htons(ETH_P_ARP);
 	msg.tipoHardware = htons(ARPHRD_ETHER);
 	msg.protocolo = htons(ETH_P_IP);
 	msg.longitudMAC = 6;
 	msg.longitudRed = 4;
 	msg.tipoARP = htons(ARPOP_REQUEST);
-	memcpy(&msg.origenMAC, &ifr.ifr_hwaddr.sa_data, 6);
-	memcpy(&msg.origenIP, &ifr.ifr_hwaddr.sa_data[2], 4);
 	memset(&msg.destinoMAC, 0x00, 6);
 
 	//Establish subnet
 	memcpy(&msg.destinoIP, &msg.origenIP, 3);
 
-	//Send 253 ARP requests
-	int i = 2;
+	//Send 254 ARP requests
+	int i = 1;
 
-	while(i < 254)
+	while(i < 255)
 	{
 		msg.destinoIP[3] = i;
 
