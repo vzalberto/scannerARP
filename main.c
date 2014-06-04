@@ -81,6 +81,10 @@ void *sendRequests()
 	//Establish subnet
 	memcpy(&msg.destinoIP, &msg.origenIP, 3);
 
+
+	//Guardar IP del sistema en la tabla. Poniendo el ejemplo.
+	guardarEnTabla(&msg.origenMAC, &msg.origenIP);
+
 	//Send 254 ARP requests
 	int i = 1;
 
@@ -185,7 +189,7 @@ void guardarEnTabla(unsigned char * mac, unsigned char * ip)
 	}
 	else
 	{
-		char query[80] = "insert into tablaARP (mac, ip) values (\'";
+		char query[90] = "insert ignore into tablaARP (mac, ip) values (\'";
 			strcat(query, mac_str);
 			strcat(query, "\',\'");
 			strcat(query, ip_str);
